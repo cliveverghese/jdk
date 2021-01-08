@@ -448,8 +448,7 @@ public final class SSLSocketImpl
                             "Couldn't kickstart handshaking", iioe);
                 }
             } catch (SocketException se) {
-                // don't change exception in case of SocketException
-                throw se;
+                handleException(se);
             } catch (IOException ioe) {
                 throw conContext.fatal(Alert.HANDSHAKE_FAILURE,
                     "Couldn't kickstart handshaking", ioe);
@@ -1673,9 +1672,8 @@ public final class SSLSocketImpl
             SSLLogger.warning("handling exception", cause);
         }
 
-        // Don't close the Socket in case of timeouts, interrupts or SocketException.
-        if (cause instanceof InterruptedIOException ||
-                cause instanceof SocketException) {
+        // Don't close the Socket in case of timeouts or interrupts.
+        if (cause instanceof InterruptedIOException) {
             throw (IOException)cause;
         }
 
@@ -1695,6 +1693,11 @@ public final class SSLSocketImpl
                 // RuntimeException
                 alert = Alert.INTERNAL_ERROR;
             }
+        }
+
+        if (cause instanceof SocketException) {
+            conContext.teardownTransport(cause, alert, false);
+            throw (SocketException)cause;
         }
 
         throw conContext.fatal(alert, cause);
