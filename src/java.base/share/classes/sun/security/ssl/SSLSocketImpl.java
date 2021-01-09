@@ -1696,6 +1696,16 @@ public final class SSLSocketImpl
         }
 
         if (cause instanceof SocketException) {
+            if (!conContext.isInboundClosed()) {
+                try {
+                    decode(null);
+                } catch (SSLException ssle) {
+                    handleException(ssle);
+                } catch (Exception e) {
+                    cause.addSuppressed(e);
+                }
+            }
+
             try {
                 conContext.fatal(alert, cause);
             } catch (Exception e) {

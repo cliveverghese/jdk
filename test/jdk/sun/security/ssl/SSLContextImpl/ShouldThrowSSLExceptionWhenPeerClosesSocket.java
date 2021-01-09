@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, Amazon and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -30,14 +30,13 @@
 
 /*
  * @test
- * @bug 7113275 8164846
- * @summary compatibility issue with MD2 trust anchor and old X509TrustManager
+ * @summary The test sets the Trust Manager in the client as empty, This
+ * causes a quick failure in the client. The server would still be processing
+ * the request in the producers causing a SocketException from the producer.
+ * The exception handler should check inputStream to identify the root cause
+ * of the issue instead of bubbling up the SocketException. 
  * @library /javax/net/ssl/templates
- * @run main/othervm TrustTrustedCert PKIX TLSv1.1 true
- * @run main/othervm TrustTrustedCert PKIX TLSv1.1 false
- * @run main/othervm TrustTrustedCert SunX509 TLSv1.1 false
- * @run main/othervm TrustTrustedCert PKIX TLSv1.2 false
- * @run main/othervm TrustTrustedCert SunX509 TLSv1.2 false
+ * @run main/othervm ShouldThrowSSLExceptionWhenPeerClosesSocket
  */
 
 import java.net.*;
@@ -49,7 +48,7 @@ import java.security.spec.*;
 import java.security.interfaces.*;
 import java.util.Base64;
 
-public class TrustTrustedCert extends SSLSocketTemplate {
+public class ShouldThrowSSLExceptionWhenPeerClosesSocket extends SSLSocketTemplate {
 
     /*
      * Certificates and key used in the test.
@@ -114,7 +113,7 @@ public class TrustTrustedCert extends SSLSocketTemplate {
 
     @Override
     protected SSLContext createServerSSLContext() throws Exception {
-        return generateSSLContext();
+        return generateSSLContext(true);
     }
 
     @Override
@@ -132,15 +131,13 @@ public class TrustTrustedCert extends SSLSocketTemplate {
             sslOS.write('A');
             sslOS.flush();
         } catch (SSLHandshakeException se) {
-            if (!expectFail) {
-                throw se;
-            }   // Otherwise, ignore.
+            // Ignore exception as this is expected.
         }
     }
 
     @Override
     protected SSLContext createClientSSLContext() throws Exception {
-        return generateSSLContext();
+        return generateSSLContext(false);
     }
 
     @Override
@@ -156,16 +153,7 @@ public class TrustTrustedCert extends SSLSocketTemplate {
             sslOS.flush();
             sslIS.read();
         } catch (SSLHandshakeException e) {
-            if (expectFail) {
-            // focus on the CertPathValidatorException
-                Throwable t = e.getCause().getCause();
-                if (t == null || !t.toString().contains("MD5withRSA")) {
-                    throw new RuntimeException(
-                        "Expected to see MD5withRSA in exception output", t);
-                }
-            } else {
-                throw e;
-            }
+            // Ignore exception as this is expected.
         }
     }
 
@@ -173,18 +161,10 @@ public class TrustTrustedCert extends SSLSocketTemplate {
      * =============================================================
      * The remainder is just support stuff
      */
-    private static String tmAlgorithm;        // trust manager
-    private static String tlsProtocol;        // trust manager
-    // set this flag to test context of CertificateException
-    private static boolean expectFail;
+    private static String tmAlgorithm = "SunX509";        // trust manager
+    private static String tlsProtocol = "TLSv1.2";        // trust manager
 
-    private static void parseArguments(String[] args) {
-        tmAlgorithm = args[0];
-        tlsProtocol = args[1];
-        expectFail = Boolean.parseBoolean(args[2]);
-    }
-
-    private static SSLContext generateSSLContext() throws Exception {
+    private static SSLContext generateSSLContext(boolean isServer) throws Exception {
 
         // generate certificate from cert string
         CertificateFactory cf = CertificateFactory.getInstance("X.509");
@@ -232,9 +212,11 @@ public class TrustTrustedCert extends SSLSocketTemplate {
             new NoneExtendedX509KM("TheKey", chain, priKey);
 
         SSLContext ctx = SSLContext.getInstance(tlsProtocol);
-        // KeyManagerFactory kmf = KeyManagerFactory.getInstance("NewSunX509");
-        // kmf.init(ks, passphrase);
-        // ctx.init(kmf.getKeyManagers(), tmf.getTrustManagers(), null);
+
+        if (!isServer) {
+            myTM = null;
+        }
+
         ctx.init(new KeyManager[]{myKM}, new TrustManager[]{myTM}, null);
         ks = null;
 
@@ -304,24 +286,8 @@ public class TrustTrustedCert extends SSLSocketTemplate {
 
     public static void main(String[] args) throws Exception {
         /*
-         * Get the customized arguments.
-         */
-        parseArguments(args);
-
-        /*
-         * MD5 is used in this test case, don't disable MD5 algorithm.
-         * if expectFail is set, we're testing exception message
-         */
-        if (!expectFail) {
-            Security.setProperty("jdk.certpath.disabledAlgorithms",
-                "MD2, RSA keySize < 1024");
-        }
-        Security.setProperty("jdk.tls.disabledAlgorithms",
-                "SSLv3, RC4, DH keySize < 768");
-
-        /*
          * Start the tests.
          */
-        new TrustTrustedCert().run();
+        new ShouldThrowSSLExceptionWhenPeerClosesSocket().run();
     }
 }
