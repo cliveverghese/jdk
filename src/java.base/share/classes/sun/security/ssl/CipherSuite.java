@@ -855,6 +855,8 @@ enum CipherSuite {
     final MacAlg macAlg;
     final HashAlg hashAlg;
 
+    private static final CipherSuite[] ciphers = CipherSuite.values();
+
     final boolean exportable;
 
     // known but unsupported cipher suite
@@ -894,7 +896,7 @@ enum CipherSuite {
     }
 
     static CipherSuite nameOf(String ciperSuiteName) {
-        for (CipherSuite cs : CipherSuite.values()) {
+        for (CipherSuite cs : ciphers) {
             if (cs.name.equals(ciperSuiteName) ||
                     cs.aliases.contains(ciperSuiteName)) {
                 return cs;
@@ -905,7 +907,7 @@ enum CipherSuite {
     }
 
     static CipherSuite valueOf(int id) {
-        for (CipherSuite cs : CipherSuite.values()) {
+        for (CipherSuite cs : ciphers) {
             if (cs.id == id) {
                 return cs;
             }
@@ -915,7 +917,7 @@ enum CipherSuite {
     }
 
     static String nameOf(int id) {
-        for (CipherSuite cs : CipherSuite.values()) {
+        for (CipherSuite cs : ciphers) {
             if (cs.id == id) {
                 return cs.name;
             }
@@ -926,7 +928,7 @@ enum CipherSuite {
 
     static Collection<CipherSuite> allowedCipherSuites() {
         Collection<CipherSuite> cipherSuites = new LinkedList<>();
-        for (CipherSuite cs : CipherSuite.values()) {
+        for (CipherSuite cs : ciphers) {
             if (!cs.supportedProtocols.isEmpty()) {
                 cipherSuites.add(cs);
             } else {
@@ -940,7 +942,7 @@ enum CipherSuite {
 
     static Collection<CipherSuite> defaultCipherSuites() {
         Collection<CipherSuite> cipherSuites = new LinkedList<>();
-        for (CipherSuite cs : CipherSuite.values()) {
+        for (CipherSuite cs : ciphers) {
             if (cs.isDefaultEnabled) {
                 cipherSuites.add(cs);
             } else {
@@ -972,7 +974,7 @@ enum CipherSuite {
             }
 
             boolean found = false;
-            for (CipherSuite cs : CipherSuite.values()) {
+            for (CipherSuite cs : ciphers) {
                 if (!cs.supportedProtocols.isEmpty()) {
                     if (cs.name.equals(name) ||
                             cs.aliases.contains(name)) {
